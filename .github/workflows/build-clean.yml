@@ -54,7 +54,7 @@ jobs:
           
           make $KERNEL_CMDLINE $KERNEL_DEFCONFIG CC="ccache clang"
           make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
-          cp -rf out/arch/arm64/boot/ ../ArtifactsKernel
+          #cp -rf out/arch/arm64/boot/ ../ArtifactsKernel
           cp -rf out/drivers/memkernel/*_memk.ko ../ArtifactsKernel
           cd ..
 
