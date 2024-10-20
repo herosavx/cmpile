@@ -59,10 +59,10 @@ jobs:
           grep -q "sysmonitor" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_SYS_MONITOR) += sysmonitor/\n" >> "$DRIVER_MAKEFILE" && echo "[+] Modified Makefile."
           grep -q "source \"drivers/sysmonitor/Kconfig\"" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\source \"drivers/sysmonitor/Kconfig\"" "$DRIVER_KCONFIG" && echo "[+] Modified Kconfig."
           echo '[+] Done.'
-          cd ..
       
       - name: Build Kernel
         run: |
+          cd ksource
           sed -i 's/# CONFIG_INPUT_QTI_HAPTICS is not set/CONFIG_INPUT_QTI_HAPTICS=y/g' arch/arm64/configs/$KERNEL_DEFCONFIG
           sed -i 's/# CONFIG_MODULES is not set/CONFIG_MODULES=y/' arch/arm64/configs/$KERNEL_DEFCONFIG
           echo -e "\nCONFIG_ASM_MODVERSIONS=y\nCONFIG_MODULE_UNLOAD=y\nCONFIG_MODVERSIONS=y" >> arch/arm64/configs/$KERNEL_DEFCONFIG
