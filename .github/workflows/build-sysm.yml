@@ -38,7 +38,7 @@ jobs:
           ./antman --patch=glibc
           cd ..
 
-          git clone --single-branch --branch=android-4.4-stable --recurse-submodules --depth 100 https://github.com/herosavx/android_kernel_xiaomi_sdm660_44.git ksource
+          git clone --single-branch --branch=stable-sysmnt --recurse-submodules --depth 100 https://github.com/herosavx/android_kernel_xiaomi_sdm660_44.git ksource
           cd ksource
           curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s v0.9.0
           cd ..
