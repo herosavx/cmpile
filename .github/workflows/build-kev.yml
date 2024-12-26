@@ -1,0 +1,77 @@
+name: Build KTouch (module) Kernel
+
+on: [workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_MAXSIZE: "2G"
+      CCACHE_HARDLINK: "true"
+      KERNEL_DEFCONFIG: "whyred_defconfig"
+      KERNEL_CMDLINE: "ARCH=arm64 CC=clang CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- LLVM=1 LLVM_IAS=1 O=out"
+      WORK_PATH: ${{github.workspace}}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt install gcc-aarch64-linux-gnu -y
+          sudo apt install gcc-arm-linux-gnueabi -y
+          sudo apt install binutils make python3 libssl-dev build-essential bc bison flex libarchive-tools unzip libssl-dev ca-certificates xz-utils mkbootimg cpio device-tree-compiler git git-lfs lld -y
+          sudo apt-get install clang-format clang-tidy clang-tools clang clangd libc++-dev libc++1 libc++abi-dev libc++abi1 libclang-dev libclang1 liblldb-dev libllvm-ocaml-dev libomp-dev libomp5 lld lldb llvm-dev llvm-runtime llvm python3-clang -y
+
+          mkdir neutron-clang
+          cd neutron-clang
+          curl -LO "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman"
+          chmod +x antman
+          ./antman -S=05012024
+          export PATH=$WORK_PATH/neutron-clang/bin/:$PATH
+          ./antman --patch=glibc
+          cd ..
+
+          git clone --single-branch --branch=android-4.4-stable --recurse-submodules --depth 100 https://github.com/herosavx/android_kernel_xiaomi_sdm660_44.git ksource
+          mkdir ArtifactsKernel
+          
+      - name: Add KTouchEvent
+        env:
+          GH_TK: ${{ secrets.GH_A_TOK }}
+        run: |
+          cd ksource
+          GKI_ROOT=$(pwd)
+          DRIVER_DIR=$GKI_ROOT/drivers
+          DRIVER_MAKEFILE=$DRIVER_DIR/Makefile
+          DRIVER_KCONFIG=$DRIVER_DIR/Kconfig
+          git clone https://$GH_TK@github.com/herosavx/KTouchEvent.git
+          cd $DRIVER_DIR
+          ln -sf "$(realpath --relative-to="$DRIVER_DIR" "$GKI_ROOT/KTouchEvent/kernel")" "ktouchev" && echo "[+] Symlink created."
+          grep -q "ktouchev" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KTOUCHEV) += ktouchev/\n" >> "$DRIVER_MAKEFILE" && echo "[+] Modified Makefile."
+          grep -q "source \"drivers/ktouchev/Kconfig\"" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\source \"drivers/ktouchev/Kconfig\"" "$DRIVER_KCONFIG" && echo "[+] Modified Kconfig."
+          echo '[+] Done.'
+      
+      - name: Build Kernel
+        run: |
+          cd ksource
+          sed -i 's/# CONFIG_INPUT_QTI_HAPTICS is not set/CONFIG_INPUT_QTI_HAPTICS=y/g' arch/arm64/configs/$KERNEL_DEFCONFIG
+          sed -i 's/# CONFIG_MODULES is not set/CONFIG_MODULES=y/' arch/arm64/configs/$KERNEL_DEFCONFIG
+          echo -e "\nCONFIG_ASM_MODVERSIONS=y\nCONFIG_MODULE_UNLOAD=y\nCONFIG_MODVERSIONS=y" >> arch/arm64/configs/$KERNEL_DEFCONFIG
+          
+          make $KERNEL_CMDLINE $KERNEL_DEFCONFIG CC="ccache clang"
+          make $KERNEL_CMDLINE CC="ccache clang" -j$(nproc --all)
+          #cp -rf out/arch/arm64/boot/ ../ArtifactsKernel
+          cp -rf out/drivers/ktouchev/*.ko ../ArtifactsKernel
+          cd ..
+
+      - name: Upload Artifacts-KERNEL
+        uses: actions/upload-artifact@v4
+        with:
+          name: Build-Artifacts
+          path: "ArtifactsKernel/*"
